@@ -2,42 +2,59 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>シーソー×玉乗り（ジャイロ最適化版）</title>
-<style>
-body { margin:0; background:#222; overflow:hidden; }
-canvas { display:block; margin:auto; background:#eee; touch-action:none; }
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>シーソー×玉乗り（スマホ最適化）</title>
 
+<style>
+body {
+  margin:0;
+  background:#222;
+  overflow:hidden;
+}
+
+#game {
+  display:block;
+  margin:auto;
+  background:#eee;
+}
+
+/* ===== ボタン ===== */
 .controls {
   position: fixed;
   bottom: 20px;
   width: 100%;
-  display: flex;
+  display:flex;
   justify-content: space-between;
-  padding: 0 40px;
+  padding: 0 30px;
+  box-sizing: border-box;
 }
 
 .btn {
-  width: 70px;
-  height: 70px;
+  width: 22vw;
+  height: 22vw;
+  max-width: 90px;
+  max-height: 90px;
+  border-radius:50%;
   background: rgba(255,255,255,0.2);
-  border-radius: 50%;
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:24px;
+  font-size: 28px;
   color:white;
 }
 
 #gyroBtn {
   position: fixed;
-  top: 20px;
-  left: 20px;
-  padding: 10px;
-  background: white;
-  border-radius: 6px;
+  top: 10px;
+  left: 10px;
+  padding: 8px 12px;
+  background:white;
+  border-radius:6px;
+  font-size:14px;
 }
 </style>
 </head>
+
 <body>
 
 <button id="gyroBtn">ジャイロ開始</button>
@@ -52,31 +69,39 @@ canvas { display:block; margin:auto; background:#eee; touch-action:none; }
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-canvas.width = 800;
-canvas.height = 400;
+// ===== 内部解像度（固定）=====
+const BASE_W = 800;
+const BASE_H = 400;
 
-// ===== 状態 =====
+// ===== リサイズ =====
+function resize(){
+  let scale = window.innerWidth / BASE_W;
+  canvas.width = BASE_W;
+  canvas.height = BASE_H;
+
+  canvas.style.width = window.innerWidth + "px";
+  canvas.style.height = (BASE_H * scale) + "px";
+}
+window.addEventListener("resize", resize);
+resize();
+
+// ===== 以下はそのまま =====
+
 let input = 0;
 let gyroInput = 0;
 let useGyro = false;
 
-// ===== ジャイロ補正 =====
 let baseGamma = 0;
 let calibrated = false;
 
-// ===== シーソー =====
 let board = { x:400, y:260, angle:0 };
-
-// ===== ボール =====
 let ball = { x:400, radius:20, vx:0 };
-
-// ===== 重心 =====
 let rider = { gx:0, gv:0 };
 let displayGx = 0;
 
 const LIMIT = ball.radius * 0.8;
 
-// ===== ボタン操作 =====
+// ボタン
 function bind(btn, val){
   btn.ontouchstart = () => input = val;
   btn.ontouchend = () => input = 0;
@@ -86,8 +111,8 @@ function bind(btn, val){
 bind(leftBtn,-1);
 bind(rightBtn,1);
 
-// ===== ジャイロ開始 =====
-document.getElementById("gyroBtn").onclick = async () => {
+// ジャイロ
+gyroBtn.onclick = async () => {
 
   calibrated = false;
 
@@ -109,30 +134,26 @@ document.getElementById("gyroBtn").onclick = async () => {
 
     let diff = raw - baseGamma;
 
-    // デッドゾーン
     if (Math.abs(diff) < 3) diff = 0;
 
     let normalized = diff / 30;
 
-    // 感度カーブ
     gyroInput = Math.sign(normalized) * Math.pow(Math.abs(normalized), 1.5);
-
     gyroInput = Math.max(-1, Math.min(1, gyroInput));
   });
 };
 
-// ===== 更新 =====
+// 更新
 function update(){
 
   let finalInput = useGyro ? gyroInput : input;
 
-  // シーソー
   let target = finalInput * 0.5;
   board.angle += (target - board.angle) * 0.05;
   board.angle *= 0.98;
 
-  // ボール
   let ax = Math.sin(board.angle) * 0.5;
+
   ball.vx += ax;
   ball.vx *= 0.99;
   ball.x += ball.vx;
@@ -141,7 +162,6 @@ function update(){
   let dy = Math.tan(board.angle) * dx;
   let ballY = board.y + dy;
 
-  // 慣性
   rider.gv += (-ax) * 0.6;
   rider.gv *= 0.92;
   rider.gx += rider.gv;
@@ -154,14 +174,13 @@ function update(){
   return ballY;
 }
 
-// ===== 描画 =====
+// 描画
 function draw(ballY){
 
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.clearRect(0,0,BASE_W,BASE_H);
 
   let stress = Math.abs(rider.gx) / LIMIT;
 
-  // シーソー
   ctx.save();
   ctx.translate(board.x, board.y);
   ctx.rotate(board.angle);
@@ -169,29 +188,24 @@ function draw(ballY){
   ctx.fillRect(-300,-5,600,10);
   ctx.restore();
 
-  // ボール
   ctx.beginPath();
   ctx.arc(ball.x, ballY, ball.radius, 0, Math.PI*2);
   ctx.fillStyle = "orange";
   ctx.fill();
 
-  // 人
   let mx = ball.x + displayGx;
   let my = ballY - ball.radius;
 
   ctx.save();
   ctx.translate(mx, my);
   ctx.rotate(displayGx * 0.02);
-
   ctx.beginPath();
   ctx.arc(0,0,10,0,Math.PI*2);
   ctx.fillStyle = "#333";
   ctx.fill();
   ctx.fillRect(-4,0,8,20);
-
   ctx.restore();
 
-  // ライン
   let color = stress < 0.4 ? "green" : (stress < 0.7 ? "orange" : "red");
   ctx.strokeStyle = color;
   ctx.lineWidth = 3;
@@ -200,15 +214,13 @@ function draw(ballY){
   ctx.lineTo(mx, my);
   ctx.stroke();
 
-  // HUD
   ctx.fillStyle = "black";
   ctx.font = "14px monospace";
-  ctx.fillText(`angle: ${(board.angle*180/Math.PI).toFixed(1)}`,10,360);
-  ctx.fillText(`speed: ${ball.vx.toFixed(2)}`,10,375);
-  ctx.fillText(`tilt: ${gyroInput.toFixed(2)}`,10,390);
+  ctx.fillText(`angle ${(board.angle*180/Math.PI).toFixed(1)}`,10,360);
+  ctx.fillText(`speed ${ball.vx.toFixed(2)}`,10,380);
 }
 
-// ===== ループ =====
+// ループ
 function loop(){
   let y = update();
   draw(y);
