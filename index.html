@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>シーソー×玉乗り（HUD付き）</title>
+<style>
+body { margin:0; background:#222; overflow:hidden; }
+canvas { display:block; margin:auto; background:#eee; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+canvas.width = 800;
+canvas.height = 400;
+
+// ===== シーソー =====
+let board = {
+  x: 400,
+  y: 260,
+  angle: 0
+};
+
+// ===== ボール =====
+let ball = {
+  x: 400,
+  radius: 20,
+  vx: 0
+};
+
+// ===== 重心 =====
+let rider = {
+  gx: 0,
+  gv: 0
+};
+
+let displayGx = 0;
+
+let input = 0;
+
+window.addEventListener("keydown", e => {
+  if (e.key === "ArrowLeft") input = -1;
+  if (e.key === "ArrowRight") input = 1;
+});
+window.addEventListener("keyup", e => {
+  if (e.key === "ArrowLeft" && input === -1) input = 0;
+  if (e.key === "ArrowRight" && input === 1) input = 0;
+});
+
+const LIMIT = ball.radius * 0.8;
+
+// ===== 更新 =====
+function update(){
+
+  // シーソー（なめらか）
+  let targetAngle = input * 0.5;
+  board.angle += (targetAngle - board.angle) * 0.05;
+  board.angle *= 0.98;
+
+  // ボール
+  let ax = Math.sin(board.angle) * 0.5;
+
+  ball.vx += ax;
+  ball.vx *= 0.99;
+  ball.x += ball.vx;
+
+  let dx = ball.x - board.x;
+  let dy = Math.tan(board.angle) * dx;
+  let ballY = board.y + dy;
+
+  // 慣性
+  rider.gv += (-ax) * 0.6;
+  rider.gv *= 0.92;
+  rider.gx += rider.gv;
+
+  rider.gx *= 0.999;
+
+  displayGx += (rider.gx - displayGx) * 0.2;
+
+  ball.x = Math.max(50, Math.min(750, ball.x));
+
+  return ballY;
+}
+
+// ===== 人 =====
+function drawRider(mx, my){
+
+  ctx.save();
+  ctx.translate(mx, my);
+
+  let angle = displayGx * 0.02;
+  ctx.rotate(angle);
+
+  ctx.beginPath();
+  ctx.arc(0,0,10,0,Math.PI*2);
+  ctx.fillStyle = "#333";
+  ctx.fill();
+
+  ctx.fillRect(-4,0,8,20);
+
+  let stress = Math.abs(rider.gx) / LIMIT;
+
+  ctx.fillStyle = "blue";
+
+  if (stress > 0.9){
+    drawSweat(-10,-20);
+    drawSweat(0,-25);
+    drawSweat(10,-20);
+  } else if (stress > 0.6){
+    drawSweat(-6,-18);
+    drawSweat(6,-18);
+  } else if (stress > 0.3){
+    drawSweat(0,-18);
+  }
+
+  ctx.restore();
+}
+
+function drawSweat(x,y){
+  ctx.beginPath();
+  ctx.arc(x,y,2.5,0,Math.PI*2);
+  ctx.fill();
+}
+
+// ===== 描画 =====
+function draw(ballY){
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  let stress = Math.abs(rider.gx) / LIMIT;
+
+  // 影
+  ctx.beginPath();
+  ctx.ellipse(ball.x + rider.gx * 0.3, ballY + 18, 20, 5, 0, 0, Math.PI*2);
+  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  ctx.fill();
+
+  // シーソー
+  ctx.save();
+  ctx.translate(board.x, board.y);
+  ctx.rotate(board.angle);
+  ctx.fillStyle = "#444";
+  ctx.fillRect(-300,-5,600,10);
+  ctx.restore();
+
+  ctx.beginPath();
+  ctx.arc(board.x, board.y, 10, 0, Math.PI*2);
+  ctx.fillStyle = "black";
+  ctx.fill();
+
+  // ボール
+  ctx.beginPath();
+  ctx.arc(ball.x, ballY, ball.radius, 0, Math.PI*2);
+  ctx.fillStyle = "orange";
+  ctx.fill();
+
+  // 人
+  let mx = ball.x + displayGx;
+  let my = ballY - ball.radius;
+  drawRider(mx, my);
+
+  // 重心ライン
+  let color = stress < 0.4 ? "green" : (stress < 0.7 ? "orange" : "red");
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+
+  ctx.beginPath();
+  ctx.moveTo(ball.x, ballY);
+  ctx.lineTo(mx, my);
+  ctx.stroke();
+
+  // ===== HUD（左下）=====
+  ctx.fillStyle = "black";
+  ctx.font = "14px monospace";
+
+  let angleDeg = (board.angle * 180 / Math.PI).toFixed(1);
+  let speed = ball.vx.toFixed(2);
+
+  ctx.fillText(`angle: ${angleDeg}°`, 10, canvas.height - 30);
+  ctx.fillText(`speed: ${speed}`, 10, canvas.height - 10);
+
+  // 操作説明
+  ctx.fillText("← → でシーソー操作", 10, 20);
+}
+
+// ===== ループ =====
+function loop(){
+  let ballY = update();
+  draw(ballY);
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
