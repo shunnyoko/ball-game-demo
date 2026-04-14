@@ -2,14 +2,48 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>シーソー×玉乗り（HUD付き）</title>
+<title>シーソー×玉乗り（スマホ対応）</title>
 <style>
 body { margin:0; background:#222; overflow:hidden; }
-canvas { display:block; margin:auto; background:#eee; }
+canvas { display:block; margin:auto; background:#eee; touch-action:none; }
+
+/* ===== スマホ操作UI ===== */
+.controls {
+  position: fixed;
+  bottom: 20px;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 40px;
+  box-sizing: border-box;
+}
+
+.btn {
+  width: 80px;
+  height: 80px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  color: white;
+  user-select: none;
+}
+
+.btn:active {
+  background: rgba(255,255,255,0.4);
+}
 </style>
 </head>
 <body>
+
 <canvas id="game"></canvas>
+
+<div class="controls">
+  <div class="btn" id="leftBtn">◀</div>
+  <div class="btn" id="rightBtn">▶</div>
+</div>
 
 <script>
 const canvas = document.getElementById("game");
@@ -19,29 +53,20 @@ canvas.width = 800;
 canvas.height = 400;
 
 // ===== シーソー =====
-let board = {
-  x: 400,
-  y: 260,
-  angle: 0
-};
+let board = { x: 400, y: 260, angle: 0 };
 
 // ===== ボール =====
-let ball = {
-  x: 400,
-  radius: 20,
-  vx: 0
-};
+let ball = { x: 400, radius: 20, vx: 0 };
 
 // ===== 重心 =====
-let rider = {
-  gx: 0,
-  gv: 0
-};
+let rider = { gx: 0, gv: 0 };
 
 let displayGx = 0;
-
 let input = 0;
 
+const LIMIT = ball.radius * 0.8;
+
+// ===== キーボード =====
 window.addEventListener("keydown", e => {
   if (e.key === "ArrowLeft") input = -1;
   if (e.key === "ArrowRight") input = 1;
@@ -51,7 +76,27 @@ window.addEventListener("keyup", e => {
   if (e.key === "ArrowRight" && input === 1) input = 0;
 });
 
-const LIMIT = ball.radius * 0.8;
+// ===== スマホボタン =====
+const leftBtn = document.getElementById("leftBtn");
+const rightBtn = document.getElementById("rightBtn");
+
+function bindButton(btn, value){
+  btn.addEventListener("touchstart", e => {
+    e.preventDefault();
+    input = value;
+  });
+
+  btn.addEventListener("touchend", () => input = 0);
+  btn.addEventListener("touchcancel", () => input = 0);
+
+  // PCでも押せるように
+  btn.addEventListener("mousedown", () => input = value);
+  btn.addEventListener("mouseup", () => input = 0);
+  btn.addEventListener("mouseleave", () => input = 0);
+}
+
+bindButton(leftBtn, -1);
+bindButton(rightBtn, 1);
 
 // ===== 更新 =====
 function update(){
@@ -76,7 +121,6 @@ function update(){
   rider.gv += (-ax) * 0.6;
   rider.gv *= 0.92;
   rider.gx += rider.gv;
-
   rider.gx *= 0.999;
 
   displayGx += (rider.gx - displayGx) * 0.2;
@@ -88,12 +132,10 @@ function update(){
 
 // ===== 人 =====
 function drawRider(mx, my){
-
   ctx.save();
   ctx.translate(mx, my);
 
-  let angle = displayGx * 0.02;
-  ctx.rotate(angle);
+  ctx.rotate(displayGx * 0.02);
 
   ctx.beginPath();
   ctx.arc(0,0,10,0,Math.PI*2);
@@ -163,29 +205,20 @@ function draw(ballY){
   let my = ballY - ball.radius;
   drawRider(mx, my);
 
-  // 重心ライン
+  // ライン
   let color = stress < 0.4 ? "green" : (stress < 0.7 ? "orange" : "red");
-
   ctx.strokeStyle = color;
   ctx.lineWidth = 3;
-
   ctx.beginPath();
   ctx.moveTo(ball.x, ballY);
   ctx.lineTo(mx, my);
   ctx.stroke();
 
-  // ===== HUD（左下）=====
+  // HUD
   ctx.fillStyle = "black";
   ctx.font = "14px monospace";
-
-  let angleDeg = (board.angle * 180 / Math.PI).toFixed(1);
-  let speed = ball.vx.toFixed(2);
-
-  ctx.fillText(`angle: ${angleDeg}°`, 10, canvas.height - 30);
-  ctx.fillText(`speed: ${speed}`, 10, canvas.height - 10);
-
-  // 操作説明
-  ctx.fillText("← → でシーソー操作", 10, 20);
+  ctx.fillText(`angle: ${(board.angle*180/Math.PI).toFixed(1)}°`, 10, canvas.height - 30);
+  ctx.fillText(`speed: ${ball.vx.toFixed(2)}`, 10, canvas.height - 10);
 }
 
 // ===== ループ =====
@@ -196,5 +229,6 @@ function loop(){
 }
 loop();
 </script>
+
 </body>
 </html>
